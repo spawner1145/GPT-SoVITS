@@ -3,7 +3,7 @@ GPT-SoVITS API 实现
 
 ### 目录结构
 GPT-SoVITS/
-├── api_114514.py                # 本文件, API 主程序
+├── api_role.py                # 本文件, API 主程序
 ├── GPT_SoVITS/                  # GPT-SoVITS 核心库
 │   └── configs/
 │       └── tts_infer.yaml       # 默认配置文件
@@ -94,7 +94,7 @@ GPT-SoVITS/
    - 成功时返回 JSON，包含 Base64 编码的音频数据
    - 失败时返回 JSON，包含错误消息和可能的异常详情
 6. 运行:
-   - python api_114514.py -a 127.0.0.1 -p 9880
+   - python api_role.py -a 127.0.0.1 -p 9880
    - 检查启动日志确认设备
    
 ### 响应示例
