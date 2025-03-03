@@ -2,7 +2,7 @@
 
 ### 目录结构
 GPT-SoVITS-roleapi/
-├── api_role.py                # 本文件, API 主程序
+├── api_role.py                  # API 主程序
 ├── GPT_SoVITS/                  # GPT-SoVITS 核心库
 │   └── configs/
 │       └── tts_infer.yaml       # 默认配置文件
