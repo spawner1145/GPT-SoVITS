@@ -6,10 +6,10 @@ GPT-SoVITS API 实现
     "text": "你好",                     # str, 必填, 要合成的文本内容
     "role": "role1",                   # str, 必填, 角色名称，决定使用 roles/{role} 中的配置和音频
     "emotion": "开心",                  # str, 可选, 情感标签，用于从 roles/{role}/reference_audios 中选择音频
-    "text_lang": "jp",                 # str, 可选, 默认 "zh", 文本语言，必须在 languages 中支持
+    "text_lang": "ja",                 # str, 可选, 默认 "zh", 文本语言，必须在 languages 中支持
     "ref_audio_path": "/path/to/ref.wav",  # str, 可选, 参考音频路径，若提供则优先使用，跳过自动选择
     "aux_ref_audio_paths": ["/path1.wav", "/path2.wav"],  # List[str], 可选, 辅助参考音频路径，用于多说话人融合
-    "prompt_lang": "jp",               # str, 可选, 提示文本语言，若提供 ref_audio_path 则需指定
+    "prompt_lang": "ja",               # str, 可选, 提示文本语言，若提供 ref_audio_path 则需指定
     "prompt_text": "こんにちは",       # str, 可选, 提示文本，与 ref_audio_path 配对使用
     "top_k": 10,                       # int, 可选, Top-K 采样值，覆盖 inference.top_k
     "top_p": 0.8,                      # float, 可选, Top-P 采样值，覆盖 inference.top_p
@@ -26,7 +26,7 @@ GPT-SoVITS API 实现
     "parallel_infer": true,            # bool, 可选, 默认 true, 是否并行推理
     "repetition_penalty": 1.35,        # float, 可选, 重复惩罚值，覆盖 inference.repetition_penalty
     "version": "v2",                   # str, 可选, 配置文件版本，覆盖 version
-    "languages": ["zh", "jp", "en"],   # List[str], 可选, 支持的语言列表，覆盖 languages
+    "languages": ["zh", "ja", "en"],   # List[str], 可选, 支持的语言列表，覆盖 languages
     "t2s_model_path": "/path/to/gpt.ckpt",  # str, 可选, GPT 模型路径，覆盖 t2s_model.path
     "t2s_model_type": "bert",          # str, 可选, GPT 模型类型，覆盖 t2s_model.model_type
     "t2s_model_device": "cpu",         # str, 可选, GPT 模型设备，覆盖 t2s_model.device，默认检测显卡
@@ -56,7 +56,7 @@ GPT-SoVITS-roleapi/
 │   │       ├── zh/
 │   │       │   ├── 【开心】voice1.wav
 │   │       │   ├── 【开心】voice1.txt
-│   │       ├── jp/
+│   │       ├── ja/
 │   │       │   ├── 【开心】voice2.wav
 │   │       │   ├── 【开心】voice2.txt
 │   ├── role2/
@@ -69,7 +69,7 @@ GPT-SoVITS-roleapi/
 │   │       │   ├── 【开心】voice1.txt
 │   │       │   ├── 【悲伤】asdafasdas.wav
 │   │       │   ├── 【悲伤】asdafasdas.txt
-│   │       ├── jp/
+│   │       ├── ja/
 │   │       │   ├── 【开心】voice2.wav
 │   │       │   ├── 【开心】voice2.txt
 
