@@ -7,7 +7,7 @@ GPT-SoVITS API 实现
     "text": "你好",                     # str, 必填, 要合成的文本内容
     "role": "role1",                   # str, 必填, 角色名称，决定使用 roles/{role} 中的配置和音频
     "emotion": "开心",                  # str, 可选, 情感标签，用于从 roles/{role}/reference_audios 中选择音频
-    "text_lang": "jp",                 # str, 可选, 默认 "zh", 文本语言，必须在 languages 中支持
+    "text_lang": "zh",                 # str, 可选, 默认 "zh", 文本语言，必须在 languages 中支持
     "ref_audio_path": "/path/to/ref.wav",  # str, 可选, 参考音频路径，若提供则优先使用，跳过自动选择
     "aux_ref_audio_paths": ["/path1.wav", "/path2.wav"],  # List[str], 可选, 辅助参考音频路径，用于多说话人融合
     "prompt_lang": "ja",               # str, 可选, 提示文本语言，若提供 ref_audio_path 则需指定
