@@ -2,12 +2,11 @@
 GPT-SoVITS API 实现
 
 ### 完整请求示例 (/ttsrole POST)
-以下是一个包含所有参数的 POST 请求示例，发送到 http://127.0.0.1:9880/ttsrole
 {
     "text": "你好",                     # str, 必填, 要合成的文本内容
     "role": "role1",                   # str, 必填, 角色名称，决定使用 roles/{role} 中的配置和音频
     "emotion": "开心",                  # str, 可选, 情感标签，用于从 roles/{role}/reference_audios 中选择音频
-    "text_lang": "zh",                 # str, 可选, 默认 "zh", 文本语言，必须在 languages 中支持
+    "text_lang": "ja",                 # str, 可选, 默认 "zh", 文本语言，必须在 languages 中支持
     "ref_audio_path": "/path/to/ref.wav",  # str, 可选, 参考音频路径，若提供则优先使用，跳过自动选择
     "aux_ref_audio_paths": ["/path1.wav", "/path2.wav"],  # List[str], 可选, 辅助参考音频路径，用于多说话人融合
     "prompt_lang": "ja",               # str, 可选, 提示文本语言，若提供 ref_audio_path 则需指定
@@ -41,8 +40,6 @@ GPT-SoVITS API 实现
   - /tts: text, text_lang, ref_audio_path, prompt_lang
 - 可选参数: 其他均为可选，默认值从 roles/{role}/tts_infer.yaml 或 GPT_SoVITS/configs/tts_infer.yaml 获取
 - 优先级: POST 请求参数 > roles/{role}/tts_infer.yaml > 默认 GPT_SoVITS/configs/tts_infer.yaml
-  - 例如: 若提供 "t2s_model_device": "cpu"，即使检测到显卡，也使用 CPU
-  - 若未提供 "ref_audio_path"（仅 /ttsrole），则根据 role、text_lang、emotion 从 roles/{role}/reference_audios 自动选择
 
 ### 目录结构
 GPT-SoVITS-roleapi/
@@ -56,10 +53,10 @@ GPT-SoVITS-roleapi/
 │   │   ├── model.ckpt             # GPT 模型（可选）
 │   │   ├── model.pth              # SoVITS 模型（可选）
 │   │   └── reference_audios/      # 角色参考音频目录
-│   │       ├── zh/                # 中文音频
-│   │       │   ├── 【开心】voice1.wav  # 参考音频文件，每个角色必有至少一个
-│   │       │   ├── 【开心】voice1.txt  # 文本文件，可选，用于对【开心】voice1.wav提供音频参考
-│   │       ├── ja/                # 日文音频
+│   │       ├── zh/
+│   │       │   ├── 【开心】voice1.wav
+│   │       │   ├── 【开心】voice1.txt
+│   │       ├── ja/
 │   │       │   ├── 【开心】voice2.wav
 │   │       │   ├── 【开心】voice2.txt
 │   ├── role2/
@@ -154,7 +151,6 @@ with requests.post(url, json=payload, stream=True) as response:
         print("流式音频已生成并保存为 output_stream.wav")
     else:
         print(f"请求失败: {response.json()}")
-
 """
 
 import os
@@ -215,10 +211,11 @@ print(f"默认设备设置为: {default_device}")
 
 # 初始化 TTS 配置
 tts_config = TTS_Config(config_path)
-if "device" not in tts_config.t2s_model:
-    tts_config.t2s_model["device"] = default_device
-if "device" not in tts_config.vits_model:
-    tts_config.vits_model["device"] = default_device
+print(f"TTS_Config contents: {tts_config.__dict__}")  # 调试配置内容
+if hasattr(tts_config, 'device'):
+    tts_config.device = default_device
+else:
+    print(f"Warning: TTS_Config has no 'device' attribute, assuming device is set in config")
 tts_pipeline = TTS(tts_config)
 
 APP = FastAPI()
@@ -227,8 +224,8 @@ class TTS_Request(BaseModel):
     text: str
     text_lang: str
     ref_audio_path: str
-    prompt_lang: str
     aux_ref_audio_paths: Optional[List[str]] = None
+    prompt_lang: str
     prompt_text: Optional[str] = ""
     top_k: Optional[int] = 5
     top_p: Optional[float] = 1
@@ -372,6 +369,8 @@ def load_role_config(role: str, req: dict):
         if os.path.exists(config_path_new):
             global tts_config, tts_pipeline
             tts_config = TTS_Config(config_path_new)
+            if hasattr(tts_config, 'device'):
+                tts_config.device = default_device
             tts_pipeline = TTS(tts_config)
     
     if not req.get("t2s_model_path"):
@@ -527,8 +526,8 @@ async def tts_get_endpoint(
     text: str,
     text_lang: str,
     ref_audio_path: str,
-    prompt_lang: str,
     aux_ref_audio_paths: Optional[List[str]] = None,
+    prompt_lang: str,
     prompt_text: str = "",
     top_k: int = 5,
     top_p: float = 1,
@@ -670,10 +669,10 @@ async def set_refer_audio(refer_audio_path: str = None):
 
 if __name__ == "__main__":
     try:
-        if host == 'None':   # 在调用时使用 -a None 参数，可以让api监听双栈
+        if host == 'None':
             host = None
         uvicorn.run(app=APP, host=host, port=port, workers=1)
     except Exception as e:
         traceback.print_exc()
         os.kill(os.getpid(), signal.SIGTERM)
-        exit(0)
+        exit(1)
