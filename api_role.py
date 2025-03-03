@@ -227,8 +227,8 @@ class TTS_Request(BaseModel):
     text: str
     text_lang: str
     ref_audio_path: str
-    aux_ref_audio_paths: Optional[List[str]] = None
     prompt_lang: str
+    aux_ref_audio_paths: Optional[List[str]] = None
     prompt_text: Optional[str] = ""
     top_k: Optional[int] = 5
     top_p: Optional[float] = 1
