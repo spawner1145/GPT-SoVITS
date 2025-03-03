@@ -2,7 +2,7 @@
 GPT-SoVITS API 实现
 
 ### 目录结构
-GPT-SoVITS/
+GPT-SoVITS-roleapi/
 ├── api_role.py                # 本文件, API 主程序
 ├── GPT_SoVITS/                  # GPT-SoVITS 核心库
 │   └── configs/
