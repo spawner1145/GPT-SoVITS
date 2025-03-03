@@ -6,10 +6,10 @@ GPT-SoVITS API 实现
     "text": "你好",                     # str, 必填, 要合成的文本内容
     "role": "role1",                   # str, 必填, 角色名称，决定使用 roles/{role} 中的配置和音频
     "emotion": "开心",                  # str, 可选, 情感标签，用于从 roles/{role}/reference_audios 中选择音频
-    "text_lang": "ja",                 # str, 可选, 默认 "zh", 文本语言，必须在 languages 中支持
+    "text_lang": "jp",                 # str, 可选, 默认 "zh", 文本语言，必须在 languages 中支持
     "ref_audio_path": "/path/to/ref.wav",  # str, 可选, 参考音频路径，若提供则优先使用，跳过自动选择
     "aux_ref_audio_paths": ["/path1.wav", "/path2.wav"],  # List[str], 可选, 辅助参考音频路径，用于多说话人融合
-    "prompt_lang": "ja",               # str, 可选, 提示文本语言，若提供 ref_audio_path 则需指定
+    "prompt_lang": "jp",               # str, 可选, 提示文本语言，若提供 ref_audio_path 则需指定
     "prompt_text": "こんにちは",       # str, 可选, 提示文本，与 ref_audio_path 配对使用
     "top_k": 10,                       # int, 可选, Top-K 采样值，覆盖 inference.top_k
     "top_p": 0.8,                      # float, 可选, Top-P 采样值，覆盖 inference.top_p
@@ -26,7 +26,7 @@ GPT-SoVITS API 实现
     "parallel_infer": true,            # bool, 可选, 默认 true, 是否并行推理
     "repetition_penalty": 1.35,        # float, 可选, 重复惩罚值，覆盖 inference.repetition_penalty
     "version": "v2",                   # str, 可选, 配置文件版本，覆盖 version
-    "languages": ["zh", "ja", "en"],   # List[str], 可选, 支持的语言列表，覆盖 languages
+    "languages": ["zh", "jp", "en"],   # List[str], 可选, 支持的语言列表，覆盖 languages
     "t2s_model_path": "/path/to/gpt.ckpt",  # str, 可选, GPT 模型路径，覆盖 t2s_model.path
     "t2s_model_type": "bert",          # str, 可选, GPT 模型类型，覆盖 t2s_model.model_type
     "t2s_model_device": "cpu",         # str, 可选, GPT 模型设备，覆盖 t2s_model.device，默认检测显卡
@@ -56,7 +56,7 @@ GPT-SoVITS-roleapi/
 │   │       ├── zh/
 │   │       │   ├── 【开心】voice1.wav
 │   │       │   ├── 【开心】voice1.txt
-│   │       ├── ja/
+│   │       ├── jp/
 │   │       │   ├── 【开心】voice2.wav
 │   │       │   ├── 【开心】voice2.txt
 │   ├── role2/
@@ -69,7 +69,7 @@ GPT-SoVITS-roleapi/
 │   │       │   ├── 【开心】voice1.txt
 │   │       │   ├── 【悲伤】asdafasdas.wav
 │   │       │   ├── 【悲伤】asdafasdas.txt
-│   │       ├── ja/
+│   │       ├── jp/
 │   │       │   ├── 【开心】voice2.wav
 │   │       │   ├── 【开心】voice2.txt
 
@@ -224,8 +224,8 @@ class TTS_Request(BaseModel):
     text: str
     text_lang: str
     ref_audio_path: str
-    aux_ref_audio_paths: Optional[List[str]] = None
     prompt_lang: str
+    aux_ref_audio_paths: Optional[List[str]] = None
     prompt_text: Optional[str] = ""
     top_k: Optional[int] = 5
     top_p: Optional[float] = 1
@@ -526,23 +526,23 @@ async def tts_get_endpoint(
     text: str,
     text_lang: str,
     ref_audio_path: str,
-    aux_ref_audio_paths: Optional[List[str]] = None,
     prompt_lang: str,
-    prompt_text: str = "",
-    top_k: int = 5,
-    top_p: float = 1,
-    temperature: float = 1,
-    text_split_method: str = "cut0",
-    batch_size: int = 1,
-    batch_threshold: float = 0.75,
-    split_bucket: bool = True,
-    speed_factor: float = 1.0,
-    fragment_interval: float = 0.3,
-    seed: int = -1,
-    media_type: str = "wav",
-    streaming_mode: bool = False,
-    parallel_infer: bool = True,
-    repetition_penalty: float = 1.35
+    aux_ref_audio_paths: Optional[List[str]] = None,
+    prompt_text: Optional[str] = "",
+    top_k: Optional[int] = 5,
+    top_p: Optional[float] = 1,
+    temperature: Optional[float] = 1,
+    text_split_method: Optional[str] = "cut0",
+    batch_size: Optional[int] = 1,
+    batch_threshold: Optional[float] = 0.75,
+    split_bucket: Optional[bool] = True,
+    speed_factor: Optional[float] = 1.0,
+    fragment_interval: Optional[float] = 0.3,
+    seed: Optional[int] = -1,
+    media_type: Optional[str] = "wav",
+    streaming_mode: Optional[bool] = False,
+    parallel_infer: Optional[bool] = True,
+    repetition_penalty: Optional[float] = 1.35
 ):
     req = {
         "text": text,
@@ -587,20 +587,20 @@ async def ttsrole_get_endpoint(
     prompt_lang: Optional[str] = None,
     prompt_text: Optional[str] = None,
     emotion: Optional[str] = None,
-    top_k: int = 5,
-    top_p: float = 1,
-    temperature: float = 1,
-    text_split_method: str = "cut5",
-    batch_size: int = 1,
-    batch_threshold: float = 0.75,
-    split_bucket: bool = True,
-    speed_factor: float = 1.0,
-    fragment_interval: float = 0.3,
-    seed: int = -1,
-    media_type: str = "wav",
-    streaming_mode: bool = False,
-    parallel_infer: bool = True,
-    repetition_penalty: float = 1.35
+    top_k: Optional[int] = 5,
+    top_p: Optional[float] = 1,
+    temperature: Optional[float] = 1,
+    text_split_method: Optional[str] = "cut5",
+    batch_size: Optional[int] = 1,
+    batch_threshold: Optional[float] = 0.75,
+    split_bucket: Optional[bool] = True,
+    speed_factor: Optional[float] = 1.0,
+    fragment_interval: Optional[float] = 0.3,
+    seed: Optional[int] = -1,
+    media_type: Optional[str] = "wav",
+    streaming_mode: Optional[bool] = False,
+    parallel_infer: Optional[bool] = True,
+    repetition_penalty: Optional[float] = 1.35
 ):
     req = {
         "text": text,
@@ -669,10 +669,10 @@ async def set_refer_audio(refer_audio_path: str = None):
 
 if __name__ == "__main__":
     try:
-        if host == 'None':
+        if host == 'None':   # 在调用时使用 -a None 参数，可以让api监听双栈
             host = None
         uvicorn.run(app=APP, host=host, port=port, workers=1)
     except Exception as e:
         traceback.print_exc()
         os.kill(os.getpid(), signal.SIGTERM)
-        exit(1)
+        exit(0)
