@@ -1,45 +1,13 @@
 """
 GPT-SoVITS API 实现
 
-### 目录结构
-GPT-SoVITS-roleapi/
-├── api_role.py                # 本文件, API 主程序
-├── GPT_SoVITS/                  # GPT-SoVITS 核心库
-│   └── configs/
-│       └── tts_infer.yaml       # 默认配置文件
-├── roles/                       # 角色配置目录
-│   ├── role1/                   # 示例角色 role1
-│   │   ├── tts_infer.yaml       # 角色配置文件（可选）
-│   │   ├── model.ckpt           # GPT 模型（可选）
-│   │   ├── model.pth            # SoVITS 模型（可选）
-│   │   └── audio/               # 角色音频目录
-│   │       ├── zh/              # 中文音频
-│   │       │   ├── [开心]voice1.wav  # 参考音频文件，每个角色必有至少一个
-│   │       │   ├── [开心]voice1.txt  # 文本文件，可选，用于对[开心]voice1.wav提供音频参考
-│   │       ├── jp/              # 日文音频
-│   │       │   ├── [开心]voice2.wav
-│   │       │   ├── [开心]voice2.txt
-│   ├── role2/
-│   │   ├── tts_infer.yaml
-│   │   ├── model.ckpt
-│   │   ├── model.pth
-│   │   └── audio/
-│   │       ├── zh/
-│   │       │   ├── [开心]voice1.wav
-│   │       │   ├── [开心]voice1.txt
-│   │       │   ├── [悲伤]asdafasdas.wav
-│   │       │   ├── [悲伤]asdafasdas.txt
-│   │       ├── jp/
-│   │       │   ├── [开心]voice2.wav
-│   │       │   ├── [开心]voice2.txt
-
 ### 完整请求示例 (/ttsrole POST)
 以下是一个包含所有参数的 POST 请求示例，发送到 http://127.0.0.1:9880/ttsrole
 {
     "text": "你好",                     # str, 必填, 要合成的文本内容
     "role": "role1",                   # str, 必填, 角色名称，决定使用 roles/{role} 中的配置和音频
     "emotion": "开心",                  # str, 可选, 情感标签，用于从 roles/{role}/audio 中选择音频
-    "text_lang": "jp",                 # str, 可选, 默认 "zh", 文本语言，必须在 languages 中支持, 去tts_infer.yaml里看
+    "text_lang": "jp",                 # str, 可选, 默认 "zh", 文本语言，必须在 languages 中支持
     "ref_audio_path": "/path/to/ref.wav",  # str, 可选, 参考音频路径，若提供则优先使用，跳过自动选择
     "aux_ref_audio_paths": ["/path1.wav", "/path2.wav"],  # List[str], 可选, 辅助参考音频路径，用于多说话人融合
     "prompt_lang": "jp",               # str, 可选, 提示文本语言，若提供 ref_audio_path 则需指定
@@ -68,71 +36,81 @@ GPT-SoVITS-roleapi/
 }
 
 ### 参数必要性和优先级
-- 必填参数: text, role（仅 /ttsrole）
+- 必填参数: 
+  - /ttsrole: text, role
+  - /tts: text, text_lang, ref_audio_path, prompt_lang
 - 可选参数: 其他均为可选，默认值从 roles/{role}/tts_infer.yaml 或 GPT_SoVITS/configs/tts_infer.yaml 获取
 - 优先级: POST 请求参数 > roles/{role}/tts_infer.yaml > 默认 GPT_SoVITS/configs/tts_infer.yaml
   - 例如: 若提供 "t2s_model_device": "cpu"，即使检测到显卡，也使用 CPU
-  - 若未提供 "ref_audio_path"，则根据 role、text_lang、emotion 从 roles/{role}/audio 自动选择
+  - 若未提供 "ref_audio_path"（仅 /ttsrole），则根据 role、text_lang、emotion 从 roles/{role}/audio 自动选择
+
+### 目录结构
+GPT-SoVITS-roleapi/
+├── api_role.py                # 本文件, API 主程序
+├── GPT_SoVITS/                  # GPT-SoVITS 核心库
+│   └── configs/
+│       └── tts_infer.yaml       # 默认配置文件
+├── roles/                       # 角色配置目录
+│   ├── role1/                   # 示例角色 role1
+│   │   ├── tts_infer.yaml       # 角色配置文件（可选）
+│   │   ├── model.ckpt           # GPT 模型（可选）
+│   │   ├── model.pth            # SoVITS 模型（可选）
+│   │   └── audio/               # 角色音频目录
+│   │       ├── zh/              # 中文音频
+│   │       │   ├── 【开心】voice1.wav  # 参考音频文件，每个角色必有至少一个
+│   │       │   ├── 【开心】voice1.txt  # 文本文件，可选，用于对【开心】voice1.wav提供音频参考
+│   │       ├── jp/              # 日文音频
+│   │       │   ├── 【开心】voice2.wav
+│   │       │   ├── 【开心】voice2.txt
+│   ├── role2/
+│   │   ├── tts_infer.yaml
+│   │   ├── model.ckpt
+│   │   ├── model.pth
+│   │   └── audio/
+│   │       ├── zh/
+│   │       │   ├── 【开心】voice1.wav
+│   │       │   ├── 【开心】voice1.txt
+│   │       │   ├── 【悲伤】asdafasdas.wav
+│   │       │   ├── 【悲伤】asdafasdas.txt
+│   │       ├── jp/
+│   │       │   ├── 【开心】voice2.wav
+│   │       │   ├── 【开心】voice2.txt
 
 ### 讲解
 1. 必填参数:
-   - text: 合成文本，核心输入
-   - role: 指定角色，决定配置和音频来源，/ttsrole 独有
-2. 音频选择:
+   - /ttsrole: text, role
+   - /tts: text, text_lang, ref_audio_path, prompt_lang
+2. 音频选择 (/ttsrole):
    - 若提供 ref_audio_path，则使用它
    - 否则根据 role、text_lang、emotion 从 roles/{role}/audio/{text_lang} 中选择
-   - emotion 匹配 [emotion] 前缀音频，未匹配则随机选择
+   - emotion 匹配 【emotion】 前缀音频，未匹配则随机选择
 3. 设备选择:
    - 默认尝试检测显卡（torch.cuda.is_available()），若可用则用 "cuda"，否则 "cpu"
    - 若缺少 torch 依赖或检测失败，回退到 "cpu"
    - POST 参数 t2s_model_device 和 vits_model_device 可强制指定设备，优先级最高
 4. 配置文件:
    - 默认加载 GPT_SoVITS/configs/tts_infer.yaml
-   - 若 roles/{role}/tts_infer.yaml 存在且未被请求参数覆盖，则使用它
+   - 若 roles/{role}/tts_infer.yaml 存在且未被请求参数覆盖，则使用它 (/ttsrole)
    - 请求参数（如 top_k）覆盖所有配置文件
 5. 返回格式:
-   - 成功时返回 JSON，包含 Base64 编码的音频数据
+   - 成功时返回音频流 (Response 或 StreamingResponse)
    - 失败时返回 JSON，包含错误消息和可能的异常详情
 6. 运行:
    - python api_role.py -a 127.0.0.1 -p 9880
    - 检查启动日志确认设备
-   
-### 响应示例
-1. 成功生成音频
-{
-    "status": "success",
-    "message": "Audio generated successfully",
-    "media_type": "wav",
-    "audio_data": "UklGRi...（Base64 编码的音频数据）"
-}
-- 状态码: 200
-- audio_data: Base64 编码的二进制音频数据
-2. 缺少必填参数 text
-{
-    "status": "error",
-    "message": "text is required"
-}
-- 状态码: 400
-3. 缺少必填参数 role
-{
-    "status": "error",
-    "message": "role is required for /ttsrole"
-}
-- 状态码: 400
-4. 角色目录不存在且无参考音频
-{
-    "status": "error",
-    "message": "Role directory not found and no suitable reference audio provided"
-}
-- 状态码: 400
-5. 运行时异常
-{
-    "status": "error",
-    "message": "tts failed",
-    "exception": "CUDA out of memory"
-}
-- 状态码: 400
 
+### 示例调用
+import requests
+
+url = "http://127.0.0.1:9880/ttsrole"
+payload = {"text": "你好", "role": "role1", "emotion": "开心", "text_lang": "zh"}
+response = requests.post(url, json=payload)
+if response.status_code == 200:
+    with open("output.wav", "wb") as f:
+        f.write(response.content)
+    print("音频已生成")
+else:
+    print(response.json())
 """
 
 import os
@@ -141,7 +119,6 @@ import traceback
 from typing import Generator, Optional, List, Dict
 import random
 import glob
-import base64  # 新增 Base64 编码支持
 
 now_dir = os.getcwd()
 sys.path.append(now_dir)
@@ -332,6 +309,8 @@ def check_params(req: dict, is_tts1: bool = False):
             return {"status": "error", "message": "ref_audio_path is required"}
         if prompt_lang in [None, ""]:
             return {"status": "error", "message": "prompt_lang is required"}
+        if text_lang in [None, ""]:
+            return {"status": "error", "message": "text_lang is required"}
     
     if text in [None, ""]:
         return {"status": "error", "message": "text is required"}
@@ -385,14 +364,14 @@ def select_ref_audio(role: str, text_lang: str, emotion: str = None):
     def find_audio_in_dir(dir_path):
         if not os.path.exists(dir_path):
             return None, None
-        audio_files = glob.glob(os.path.join(dir_path, "[*]*.*"))
+        audio_files = glob.glob(os.path.join(dir_path, "【*】*.*"))  # 修改为匹配【emotion】
         if not audio_files:
             audio_files = glob.glob(os.path.join(dir_path, "*.*"))
         if not audio_files:
             return None, None
         
         if emotion:
-            emotion_files = [f for f in audio_files if f"[{emotion}]" in os.path.basename(f)]
+            emotion_files = [f for f in audio_files if f"【{emotion}】" in os.path.basename(f)]  # 修改为匹配【emotion】
             if emotion_files:
                 audio_path = random.choice(emotion_files)
             else:
@@ -490,19 +469,17 @@ async def tts_handle(req: dict, is_tts1: bool = False):
         tts_generator = tts_pipeline.run(req)
         
         if streaming_mode:
-            # 流式模式暂不支持 Base64，返回错误
-            return JSONResponse(status_code=400, content={"status": "error", "message": "Streaming mode is not supported with Base64 response"})
+            def streaming_generator(tts_generator: Generator, media_type: str):
+                if media_type == "wav":
+                    yield wave_header_chunk()
+                    media_type = "raw"
+                for sr, chunk in tts_generator:
+                    yield pack_audio(BytesIO(), chunk, sr, media_type).getvalue()
+            return StreamingResponse(streaming_generator(tts_generator, media_type), media_type=f"audio/{media_type}")
         else:
             sr, audio_data = next(tts_generator)
             audio_bytes = pack_audio(BytesIO(), audio_data, sr, media_type).getvalue()
-            audio_base64 = base64.b64encode(audio_bytes).decode('utf-8')
-            response_json = {
-                "status": "success",
-                "message": "Audio generated successfully",
-                "media_type": media_type,
-                "audio_data": audio_base64
-            }
-            return JSONResponse(status_code=200, content=response_json)
+            return Response(audio_bytes, media_type=f"audio/{media_type}")
     except Exception as e:
         return JSONResponse(status_code=400, content={"status": "error", "message": "tts failed", "exception": str(e)})
 
@@ -630,7 +607,7 @@ async def set_refer_audio(refer_audio_path: str = None):
 
 if __name__ == "__main__":
     try:
-        if host == 'None':   # 在调用时使用 -a None 参数，可以让api监听双栈
+        if host == 'None':
             host = None
         uvicorn.run(app=APP, host=host, port=port, workers=1)
     except Exception as e:
