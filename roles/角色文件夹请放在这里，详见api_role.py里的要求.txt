@@ -2,27 +2,27 @@
 
 ### 目录结构
 GPT-SoVITS-roleapi/
-├── api_role.py                  # API 主程序
-├── GPT_SoVITS/                  # GPT-SoVITS 核心库
+├── api_role.py                    # API 主程序
+├── GPT_SoVITS/                    # GPT-SoVITS 核心库
 │   └── configs/
-│       └── tts_infer.yaml       # 默认配置文件
-├── roles/                       # 角色配置目录
-│   ├── role1/                   # 示例角色 role1
-│   │   ├── tts_infer.yaml       # 角色配置文件（可选）
-│   │   ├── model.ckpt           # GPT 模型（可选）
-│   │   ├── model.pth            # SoVITS 模型（可选）
-│   │   └── audio/               # 角色音频目录
-│   │       ├── zh/              # 中文音频
+│       └── tts_infer.yaml         # 默认配置文件
+├── roles/                         # 角色配置目录
+│   ├── role1/                     # 示例角色 role1
+│   │   ├── tts_infer.yaml         # 角色配置文件（可选）
+│   │   ├── model.ckpt             # GPT 模型（可选）
+│   │   ├── model.pth              # SoVITS 模型（可选）
+│   │   └── reference_audios/      # 角色参考音频目录
+│   │       ├── zh/                # 中文音频
 │   │       │   ├── 【开心】voice1.wav  # 参考音频文件，每个角色必有至少一个
 │   │       │   ├── 【开心】voice1.txt  # 文本文件，可选，用于对【开心】voice1.wav提供音频参考
-│   │       ├── jp/              # 日文音频
+│   │       ├── jp/                # 日文音频
 │   │       │   ├── 【开心】voice2.wav
 │   │       │   ├── 【开心】voice2.txt
 │   ├── role2/
 │   │   ├── tts_infer.yaml
 │   │   ├── model.ckpt
 │   │   ├── model.pth
-│   │   └── audio/
+│   │   └── reference_audios/
 │   │       ├── zh/
 │   │       │   ├── 【开心】voice1.wav
 │   │       │   ├── 【开心】voice1.txt
