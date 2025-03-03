@@ -6,7 +6,7 @@ GPT-SoVITS API 实现
 {
     "text": "你好",                     # str, 必填, 要合成的文本内容
     "role": "role1",                   # str, 必填, 角色名称，决定使用 roles/{role} 中的配置和音频
-    "emotion": "开心",                  # str, 可选, 情感标签，用于从 roles/{role}/audio 中选择音频
+    "emotion": "开心",                  # str, 可选, 情感标签，用于从 roles/{role}/reference_audios 中选择音频
     "text_lang": "jp",                 # str, 可选, 默认 "zh", 文本语言，必须在 languages 中支持
     "ref_audio_path": "/path/to/ref.wav",  # str, 可选, 参考音频路径，若提供则优先使用，跳过自动选择
     "aux_ref_audio_paths": ["/path1.wav", "/path2.wav"],  # List[str], 可选, 辅助参考音频路径，用于多说话人融合
@@ -42,31 +42,31 @@ GPT-SoVITS API 实现
 - 可选参数: 其他均为可选，默认值从 roles/{role}/tts_infer.yaml 或 GPT_SoVITS/configs/tts_infer.yaml 获取
 - 优先级: POST 请求参数 > roles/{role}/tts_infer.yaml > 默认 GPT_SoVITS/configs/tts_infer.yaml
   - 例如: 若提供 "t2s_model_device": "cpu"，即使检测到显卡，也使用 CPU
-  - 若未提供 "ref_audio_path"（仅 /ttsrole），则根据 role、text_lang、emotion 从 roles/{role}/audio 自动选择
+  - 若未提供 "ref_audio_path"（仅 /ttsrole），则根据 role、text_lang、emotion 从 roles/{role}/reference_audios 自动选择
 
 ### 目录结构
 GPT-SoVITS-roleapi/
-├── api_role.py                # 本文件, API 主程序
-├── GPT_SoVITS/                  # GPT-SoVITS 核心库
+├── api_role.py                    # 本文件, API 主程序
+├── GPT_SoVITS/                    # GPT-SoVITS 核心库
 │   └── configs/
-│       └── tts_infer.yaml       # 默认配置文件
-├── roles/                       # 角色配置目录
-│   ├── role1/                   # 示例角色 role1
-│   │   ├── tts_infer.yaml       # 角色配置文件（可选）
-│   │   ├── model.ckpt           # GPT 模型（可选）
-│   │   ├── model.pth            # SoVITS 模型（可选）
-│   │   └── audio/               # 角色音频目录
-│   │       ├── zh/              # 中文音频
+│       └── tts_infer.yaml         # 默认配置文件
+├── roles/                         # 角色配置目录
+│   ├── role1/                     # 示例角色 role1
+│   │   ├── tts_infer.yaml         # 角色配置文件（可选）
+│   │   ├── model.ckpt             # GPT 模型（可选）
+│   │   ├── model.pth              # SoVITS 模型（可选）
+│   │   └── reference_audios/      # 角色参考音频目录
+│   │       ├── zh/                # 中文音频
 │   │       │   ├── 【开心】voice1.wav  # 参考音频文件，每个角色必有至少一个
 │   │       │   ├── 【开心】voice1.txt  # 文本文件，可选，用于对【开心】voice1.wav提供音频参考
-│   │       ├── jp/              # 日文音频
+│   │       ├── jp/                # 日文音频
 │   │       │   ├── 【开心】voice2.wav
 │   │       │   ├── 【开心】voice2.txt
 │   ├── role2/
 │   │   ├── tts_infer.yaml
 │   │   ├── model.ckpt
 │   │   ├── model.pth
-│   │   └── audio/
+│   │   └── reference_audios/
 │   │       ├── zh/
 │   │       │   ├── 【开心】voice1.wav
 │   │       │   ├── 【开心】voice1.txt
@@ -86,7 +86,7 @@ GPT-SoVITS-roleapi/
        - 如果存在对应 .txt 文件（如 "ref.txt"），prompt_text = .txt 文件内容
        - 如果无对应 .txt 文件，prompt_text = "ref"（去掉 ".wav" 的部分）
 2. 如果未提供 ref_audio_path：
-   - 从 roles/{role}/audio/{text_lang} 中选择音频：
+   - 从 roles/{role}/reference_audios/{text_lang} 中选择音频：
      - 优先匹配 "【emotion】" 前缀的音频（如 "【开心】voice1.wav"）
      - 如果存在对应 .txt 文件（如 "【开心】voice1.txt"），prompt_text = .txt 文件内容
      - 如果无对应 .txt 文件，prompt_text = "voice1"（去掉 "【开心】" 和 ".wav" 的部分）
@@ -98,7 +98,7 @@ GPT-SoVITS-roleapi/
    - /tts: text, text_lang, ref_audio_path, prompt_lang
 2. 音频选择 (/ttsrole):
    - 若提供 ref_audio_path，则使用它
-   - 否则根据 role、text_lang、emotion 从 roles/{role}/audio/{text_lang} 中选择
+   - 否则根据 role、text_lang、emotion 从 roles/{role}/reference_audios/{text_lang} 中选择
    - emotion 匹配 【emotion】 前缀音频，未匹配则随机选择
 3. 设备选择:
    - 默认尝试检测显卡（torch.cuda.is_available()），若可用则用 "cuda"，否则 "cpu"
@@ -387,7 +387,7 @@ def load_role_config(role: str, req: dict):
     return True
 
 def select_ref_audio(role: str, text_lang: str, emotion: str = None):
-    audio_base_dir = os.path.join(now_dir, "roles", role, "audio")
+    audio_base_dir = os.path.join(now_dir, "roles", role, "reference_audios")
     if not os.path.exists(audio_base_dir):
         return None, None, None
     
