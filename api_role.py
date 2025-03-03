@@ -33,8 +33,8 @@ GPT-SoVITS/
 │   │       │   ├── [开心]voice2.wav
 │   │       │   ├── [开心]voice2.txt
 
-### 完整请求示例 (/tts114514 POST)
-以下是一个包含所有参数的 POST 请求示例，发送到 http://127.0.0.1:9880/tts114514
+### 完整请求示例 (/ttsrole POST)
+以下是一个包含所有参数的 POST 请求示例，发送到 http://127.0.0.1:9880/ttsrole
 {
     "text": "你好",                     # str, 必填, 要合成的文本内容
     "role": "role1",                   # str, 必填, 角色名称，决定使用 roles/{role} 中的配置和音频
@@ -68,7 +68,7 @@ GPT-SoVITS/
 }
 
 ### 参数必要性和优先级
-- 必填参数: text, role（仅 /tts114514）
+- 必填参数: text, role（仅 /ttsrole）
 - 可选参数: 其他均为可选，默认值从 roles/{role}/tts_infer.yaml 或 GPT_SoVITS/configs/tts_infer.yaml 获取
 - 优先级: POST 请求参数 > roles/{role}/tts_infer.yaml > 默认 GPT_SoVITS/configs/tts_infer.yaml
   - 例如: 若提供 "t2s_model_device": "cpu"，即使检测到显卡，也使用 CPU
@@ -77,7 +77,7 @@ GPT-SoVITS/
 ### 讲解
 1. 必填参数:
    - text: 合成文本，核心输入
-   - role: 指定角色，决定配置和音频来源，/tts114514 独有
+   - role: 指定角色，决定配置和音频来源，/ttsrole 独有
 2. 音频选择:
    - 若提供 ref_audio_path，则使用它
    - 否则根据 role、text_lang、emotion 从 roles/{role}/audio/{text_lang} 中选择
@@ -116,7 +116,7 @@ GPT-SoVITS/
 3. 缺少必填参数 role
 {
     "status": "error",
-    "message": "role is required for /tts114514"
+    "message": "role is required for /ttsrole"
 }
 - 状态码: 400
 4. 角色目录不存在且无参考音频
@@ -326,7 +326,7 @@ def check_params(req: dict, is_tts1: bool = False):
     if is_tts1:
         role: str = req.get("role", "")
         if role in [None, ""]:
-            return {"status": "error", "message": "role is required for /tts114514"}
+            return {"status": "error", "message": "role is required for /ttsrole"}
     else:
         if ref_audio_path in [None, ""]:
             return {"status": "error", "message": "ref_audio_path is required"}
@@ -555,7 +555,7 @@ async def tts_post_endpoint(request: TTS_Request):
         req["prompt_lang"] = req["prompt_lang"].lower()
     return await tts_handle(req)
 
-@APP.get("/tts114514")
+@APP.get("/ttsrole")
 async def tts1_get_endpoint(
     text: str = None, text_lang: str = "zh", ref_audio_path: str = None,
     aux_ref_audio_paths: List[str] = None, prompt_lang: str = None, prompt_text: str = None,
@@ -591,7 +591,7 @@ async def tts1_get_endpoint(
     }
     return await tts_handle(req, is_tts1=True)
 
-@APP.post("/tts114514")
+@APP.post("/ttsrole")
 async def tts1_post_endpoint(request: TTS1_Request):
     req = request.dict()
     if req["text_lang"]:
