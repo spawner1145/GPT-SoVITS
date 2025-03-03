@@ -76,6 +76,22 @@ GPT-SoVITS-roleapi/
 │   │       │   ├── 【开心】voice2.wav
 │   │       │   ├── 【开心】voice2.txt
 
+### prompt_text 选择逻辑 (/ttsrole)
+1. 如果提供了 ref_audio_path（如 "/path/to/ref.wav"）：
+   - 检查文件名是否包含 "【xxx】" 前缀：
+     - 如果有（如 "【开心】abc.wav"）：
+       - 如果存在对应 .txt 文件（如 "【开心】abc.txt"），prompt_text = .txt 文件内容
+       - 如果无对应 .txt 文件，prompt_text = "abc"（去掉 "【开心】" 和 ".wav" 的部分）
+     - 如果无 "【xxx】" 前缀：
+       - 如果存在对应 .txt 文件（如 "ref.txt"），prompt_text = .txt 文件内容
+       - 如果无对应 .txt 文件，prompt_text = "ref"（去掉 ".wav" 的部分）
+2. 如果未提供 ref_audio_path：
+   - 从 roles/{role}/audio/{text_lang} 中选择音频：
+     - 优先匹配 "【emotion】" 前缀的音频（如 "【开心】voice1.wav"）
+     - 如果存在对应 .txt 文件（如 "【开心】voice1.txt"），prompt_text = .txt 文件内容
+     - 如果无对应 .txt 文件，prompt_text = "voice1"（去掉 "【开心】" 和 ".wav" 的部分）
+     - 未匹配 emotion 则随机选择一个音频，逻辑同上
+
 ### 讲解
 1. 必填参数:
    - /ttsrole: text, role
@@ -99,18 +115,46 @@ GPT-SoVITS-roleapi/
    - python api_role.py -a 127.0.0.1 -p 9880
    - 检查启动日志确认设备
 
-### 示例调用
+### 调用示例 (/ttsrole)
+## 非流式调用，会一次性返回完整的音频数据，适用于需要完整音频文件的场景
 import requests
-
 url = "http://127.0.0.1:9880/ttsrole"
-payload = {"text": "你好", "role": "role1", "emotion": "开心", "text_lang": "zh"}
+payload = {
+    "text": "你好，这是一个测试",  # 要合成的文本
+    "role": "role1",               # 角色名称，必填
+    "emotion": "开心",              # 情感标签，可选
+    "text_lang": "zh",             # 文本语言，可选，默认为 "zh"
+    "media_type": "wav"            # 输出音频格式，默认 "wav"
+}
 response = requests.post(url, json=payload)
 if response.status_code == 200:
-    with open("output.wav", "wb") as f:
+    with open("output_non_stream.wav", "wb") as f:
         f.write(response.content)
-    print("音频已生成")
+    print("非流式音频已生成并保存为 output_non_stream.wav")
 else:
-    print(response.json())
+    print(f"请求失败: {response.json()}")
+
+## 流式调用，会分块返回音频数据，适用于实时播放或处理大文件的场景
+import requests
+url = "http://127.0.0.1:9880/ttsrole"
+payload = {
+    "text": "你好，这是一个测试",  # 要合成的文本
+    "role": "role1",               # 角色名称，必填
+    "emotion": "开心",              # 情感标签，可选
+    "text_lang": "zh",             # 文本语言，可选，默认为 "zh"
+    "media_type": "wav",           # 输出音频格式，默认 "wav"
+    "streaming_mode": True         # 启用流式模式
+}
+with requests.post(url, json=payload, stream=True) as response:
+    if response.status_code == 200:
+        with open("output_stream.wav", "wb") as f:
+            for chunk in response.iter_content(chunk_size=1024):
+                if chunk:  # 确保 chunk 不为空
+                    f.write(chunk)
+        print("流式音频已生成并保存为 output_stream.wav")
+    else:
+        print(f"请求失败: {response.json()}")
+
 """
 
 import os
@@ -130,7 +174,7 @@ import wave
 import signal
 import numpy as np
 import soundfile as sf
-from fastapi import FastAPI, Request, HTTPException, Response
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel
 import uvicorn
@@ -180,64 +224,50 @@ tts_pipeline = TTS(tts_config)
 APP = FastAPI()
 
 class TTS_Request(BaseModel):
-    text: str = None
-    text_lang: str = None
-    ref_audio_path: str = None
-    aux_ref_audio_paths: List[str] = None
-    prompt_lang: str = None
-    prompt_text: str = ""
-    top_k: int = None
-    top_p: float = None
-    temperature: float = None
-    text_split_method: str = None
-    batch_size: int = None
-    batch_threshold: float = None
-    split_bucket: bool = None
-    speed_factor: float = None
-    fragment_interval: float = None
-    seed: int = None
-    media_type: str = "wav"
-    streaming_mode: bool = False
-    parallel_infer: bool = True
-    repetition_penalty: float = None
-    version: str = None
-    languages: List[str] = None
-    t2s_model_path: str = None
-    t2s_model_type: str = None
-    t2s_model_device: str = None
-    vits_model_path: str = None
-    vits_model_device: str = None
+    text: str
+    text_lang: str
+    ref_audio_path: str
+    aux_ref_audio_paths: Optional[List[str]] = None
+    prompt_lang: str
+    prompt_text: Optional[str] = ""
+    top_k: Optional[int] = 5
+    top_p: Optional[float] = 1
+    temperature: Optional[float] = 1
+    text_split_method: Optional[str] = "cut5"
+    batch_size: Optional[int] = 1
+    batch_threshold: Optional[float] = 0.75
+    split_bucket: Optional[bool] = True
+    speed_factor: Optional[float] = 1.0
+    fragment_interval: Optional[float] = 0.3
+    seed: Optional[int] = -1
+    media_type: Optional[str] = "wav"
+    streaming_mode: Optional[bool] = False
+    parallel_infer: Optional[bool] = True
+    repetition_penalty: Optional[float] = 1.35
 
-class TTS1_Request(BaseModel):
-    text: str = None
-    text_lang: str = "zh"
-    ref_audio_path: str = None
-    aux_ref_audio_paths: List[str] = None
-    prompt_lang: str = None
-    prompt_text: str = None
-    emotion: str = None
-    role: str = None
-    top_k: int = None
-    top_p: float = None
-    temperature: float = None
-    text_split_method: str = None
-    batch_size: int = None
-    batch_threshold: float = None
-    split_bucket: bool = None
-    speed_factor: float = None
-    fragment_interval: float = None
-    seed: int = None
-    media_type: str = "wav"
-    streaming_mode: bool = False
-    parallel_infer: bool = True
-    repetition_penalty: float = None
-    version: str = None
-    languages: List[str] = None
-    t2s_model_path: str = None
-    t2s_model_type: str = None
-    t2s_model_device: str = None
-    vits_model_path: str = None
-    vits_model_device: str = None
+class TTSRole_Request(BaseModel):
+    text: str
+    role: str
+    text_lang: Optional[str] = "zh"
+    ref_audio_path: Optional[str] = None
+    aux_ref_audio_paths: Optional[List[str]] = None
+    prompt_lang: Optional[str] = None
+    prompt_text: Optional[str] = None
+    emotion: Optional[str] = None
+    top_k: Optional[int] = 5
+    top_p: Optional[float] = 1
+    temperature: Optional[float] = 1
+    text_split_method: Optional[str] = "cut5"
+    batch_size: Optional[int] = 1
+    batch_threshold: Optional[float] = 0.75
+    split_bucket: Optional[bool] = True
+    speed_factor: Optional[float] = 1.0
+    fragment_interval: Optional[float] = 0.3
+    seed: Optional[int] = -1
+    media_type: Optional[str] = "wav"
+    streaming_mode: Optional[bool] = False
+    parallel_infer: Optional[bool] = True
+    repetition_penalty: Optional[float] = 1.35
 
 def pack_ogg(io_buffer: BytesIO, data: np.ndarray, rate: int):
     with sf.SoundFile(io_buffer, mode='w', samplerate=rate, channels=1, format='ogg') as audio_file:
@@ -249,9 +279,10 @@ def pack_raw(io_buffer: BytesIO, data: np.ndarray, rate: int):
     return io_buffer
 
 def pack_wav(io_buffer: BytesIO, data: np.ndarray, rate: int):
-    io_buffer = BytesIO()
-    sf.write(io_buffer, data, rate, format='wav')
-    return io_buffer
+    with BytesIO() as wav_buf:
+        sf.write(wav_buf, data, rate, format='wav')
+        wav_buf.seek(0)
+        return wav_buf
 
 def pack_aac(io_buffer: BytesIO, data: np.ndarray, rate: int):
     process = subprocess.Popen([
@@ -262,7 +293,8 @@ def pack_aac(io_buffer: BytesIO, data: np.ndarray, rate: int):
     io_buffer.write(out)
     return io_buffer
 
-def pack_audio(io_buffer: BytesIO, data: np.ndarray, rate: int, media_type: str):
+def pack_audio(data: np.ndarray, rate: int, media_type: str) -> BytesIO:
+    io_buffer = BytesIO()
     if media_type == "ogg":
         io_buffer = pack_ogg(io_buffer, data, rate)
     elif media_type == "aac":
@@ -291,38 +323,39 @@ def handle_control(command: str):
         os.kill(os.getpid(), signal.SIGTERM)
         exit(0)
 
-def check_params(req: dict, is_tts1: bool = False):
-    text: str = req.get("text", "")
-    text_lang: str = req.get("text_lang", "zh" if is_tts1 else "")
-    ref_audio_path: str = req.get("ref_audio_path", "")
-    streaming_mode: bool = req.get("streaming_mode", False)
-    media_type: str = req.get("media_type", "wav")
-    prompt_lang: str = req.get("prompt_lang", "")
-    text_split_method: str = req.get("text_split_method", "cut5")
-    
-    if is_tts1:
-        role: str = req.get("role", "")
-        if role in [None, ""]:
-            return {"status": "error", "message": "role is required for /ttsrole"}
-    else:
-        if ref_audio_path in [None, ""]:
-            return {"status": "error", "message": "ref_audio_path is required"}
-        if prompt_lang in [None, ""]:
-            return {"status": "error", "message": "prompt_lang is required"}
-        if text_lang in [None, ""]:
-            return {"status": "error", "message": "text_lang is required"}
-    
-    if text in [None, ""]:
+def check_params(req: dict, is_ttsrole: bool = False):
+    text = req.get("text")
+    text_lang = req.get("text_lang")
+    ref_audio_path = req.get("ref_audio_path")
+    prompt_lang = req.get("prompt_lang")
+    media_type = req.get("media_type", "wav")
+    streaming_mode = req.get("streaming_mode", False)
+    text_split_method = req.get("text_split_method", "cut5")
+
+    if not text:
         return {"status": "error", "message": "text is required"}
     
+    if is_ttsrole:
+        role = req.get("role")
+        if not role:
+            return {"status": "error", "message": "role is required for /ttsrole"}
+    else:
+        if not text_lang:
+            return {"status": "error", "message": "text_lang is required"}
+        if not ref_audio_path:
+            return {"status": "error", "message": "ref_audio_path is required"}
+        if not prompt_lang:
+            return {"status": "error", "message": "prompt_lang is required"}
+    
     languages = req.get("languages") or tts_config.languages
-    if text_lang.lower() not in languages:
+    if text_lang and text_lang.lower() not in languages:
         return {"status": "error", "message": f"text_lang: {text_lang} is not supported"}
-    if not is_tts1 and prompt_lang.lower() not in languages:
+    if prompt_lang and prompt_lang.lower() not in languages:
         return {"status": "error", "message": f"prompt_lang: {prompt_lang} is not supported"}
+    
     if media_type not in ["wav", "raw", "ogg", "aac"]:
         return {"status": "error", "message": f"media_type: {media_type} is not supported"}
-    elif media_type == "ogg" and not streaming_mode:
+    if media_type == "ogg" and not streaming_mode:
         return {"status": "error", "message": "ogg format is not supported in non-streaming mode"}
     if text_split_method not in cut_method_names:
         return {"status": "error", "message": f"text_split_method: {text_split_method} is not supported"}
@@ -364,14 +397,14 @@ def select_ref_audio(role: str, text_lang: str, emotion: str = None):
     def find_audio_in_dir(dir_path):
         if not os.path.exists(dir_path):
             return None, None
-        audio_files = glob.glob(os.path.join(dir_path, "【*】*.*"))  # 修改为匹配【emotion】
+        audio_files = glob.glob(os.path.join(dir_path, "【*】*.*"))
         if not audio_files:
             audio_files = glob.glob(os.path.join(dir_path, "*.*"))
         if not audio_files:
             return None, None
         
         if emotion:
-            emotion_files = [f for f in audio_files if f"【{emotion}】" in os.path.basename(f)]  # 修改为匹配【emotion】
+            emotion_files = [f for f in audio_files if f"【{emotion}】" in os.path.basename(f)]
             if emotion_files:
                 audio_path = random.choice(emotion_files)
             else:
@@ -384,6 +417,14 @@ def select_ref_audio(role: str, text_lang: str, emotion: str = None):
         if os.path.exists(txt_path):
             with open(txt_path, "r", encoding="utf-8") as f:
                 prompt_text = f.read().strip()
+        else:
+            basename = os.path.basename(audio_path)
+            start_idx = basename.find("】") + 1
+            end_idx = basename.rfind(".")
+            if start_idx > 0 and end_idx > start_idx:
+                prompt_text = basename[start_idx:end_idx]
+            else:
+                prompt_text = basename[:end_idx] if end_idx > 0 else basename
         
         return audio_path, prompt_text
     
@@ -399,16 +440,26 @@ def select_ref_audio(role: str, text_lang: str, emotion: str = None):
     
     return None, None, None
 
-async def tts_handle(req: dict, is_tts1: bool = False):
+async def tts_handle(req: dict, is_ttsrole: bool = False):
+    """
+    Text to speech handler.
+    
+    Args:
+        req (dict): Request parameters for TTS inference.
+        is_ttsrole (bool): Whether to use role-based inference (True for /ttsrole, False for /tts).
+    Returns:
+        Response or StreamingResponse: Audio stream response if successful.
+        JSONResponse: Error message if failed.
+    """
     streaming_mode = req.get("streaming_mode", False)
     media_type = req.get("media_type", "wav")
-    
-    check_res = check_params(req, is_tts1)
+
+    check_res = check_params(req, is_ttsrole)
     if check_res is not None:
         return JSONResponse(status_code=400, content=check_res)
     
     role_exists = False
-    if is_tts1:
+    if is_ttsrole:
         role_exists = load_role_config(req["role"], req)
         
         if not req.get("ref_audio_path"):
@@ -416,51 +467,27 @@ async def tts_handle(req: dict, is_tts1: bool = False):
             if ref_audio_path:
                 req["ref_audio_path"] = ref_audio_path
                 req["prompt_text"] = prompt_text or ""
-                req["prompt_lang"] = prompt_lang
+                req["prompt_lang"] = prompt_lang or req["text_lang"]
             elif not role_exists:
                 return JSONResponse(status_code=400, content={"status": "error", "message": "Role directory not found and no suitable reference audio provided"})
-    
-    # 应用请求中的 YAML 参数，优先级最高
-    if req.get("version"):
-        tts_config.version = req["version"]
-    if req.get("languages"):
-        tts_config.languages = req["languages"]
-    if req.get("t2s_model_path"):
-        tts_config.t2s_model["path"] = req["t2s_model_path"]
-        tts_pipeline.init_t2s_weights(req["t2s_model_path"])
-    if req.get("t2s_model_type"):
-        tts_config.t2s_model["model_type"] = req["t2s_model_type"]
-    if req.get("t2s_model_device"):
-        tts_config.t2s_model["device"] = req["t2s_model_device"]
-    if req.get("vits_model_path"):
-        tts_config.vits_model["path"] = req["vits_model_path"]
-        tts_pipeline.init_vits_weights(req["vits_model_path"])
-    if req.get("vits_model_device"):
-        tts_config.vits_model["device"] = req["vits_model_device"]
-    
-    inference = tts_config.inference
-    if req.get("top_k") is not None:
-        inference["top_k"] = req["top_k"]
-    if req.get("top_p") is not None:
-        inference["top_p"] = req["top_p"]
-    if req.get("temperature") is not None:
-        inference["temperature"] = req["temperature"]
-    if req.get("text_split_method"):
-        inference["text_split_method"] = req["text_split_method"]
-    if req.get("batch_size") is not None:
-        inference["batch_size"] = req["batch_size"]
-    if req.get("batch_threshold") is not None:
-        inference["batch_threshold"] = req["batch_threshold"]
-    if req.get("split_bucket") is not None:
-        inference["split_bucket"] = req["split_bucket"]
-    if req.get("speed_factor") is not None:
-        inference["speed_factor"] = req["speed_factor"]
-    if req.get("fragment_interval") is not None:
-        inference["fragment_interval"] = req["fragment_interval"]
-    if req.get("repetition_penalty") is not None:
-        inference["repetition_penalty"] = req["repetition_penalty"]
-    if req.get("seed") is not None:
-        tts_config.seed = req["seed"]
+        else:
+            ref_audio_path = req["ref_audio_path"]
+            txt_path = ref_audio_path.rsplit(".", 1)[0] + ".txt"
+            if os.path.exists(txt_path):
+                with open(txt_path, "r", encoding="utf-8") as f:
+                    req["prompt_text"] = f.read().strip()
+            else:
+                basename = os.path.basename(ref_audio_path)
+                if "【" in basename and "】" in basename:
+                    start_idx = basename.find("】") + 1
+                    end_idx = basename.rfind(".")
+                    if start_idx > 0 and end_idx > start_idx:
+                        req["prompt_text"] = basename[start_idx:end_idx]
+                    else:
+                        req["prompt_text"] = basename[:end_idx] if end_idx > 0 else basename
+                else:
+                    end_idx = basename.rfind(".")
+                    req["prompt_text"] = basename[:end_idx] if end_idx > 0 else basename
     
     if streaming_mode:
         req["return_fragment"] = True
@@ -469,17 +496,23 @@ async def tts_handle(req: dict, is_tts1: bool = False):
         tts_generator = tts_pipeline.run(req)
         
         if streaming_mode:
-            def streaming_generator(tts_generator: Generator, media_type: str):
+            def streaming_generator():
                 if media_type == "wav":
                     yield wave_header_chunk()
-                    media_type = "raw"
+                    stream_type = "raw"
+                else:
+                    stream_type = media_type
                 for sr, chunk in tts_generator:
-                    yield pack_audio(BytesIO(), chunk, sr, media_type).getvalue()
-            return StreamingResponse(streaming_generator(tts_generator, media_type), media_type=f"audio/{media_type}")
+                    buf = pack_audio(chunk, sr, stream_type)
+                    yield buf.getvalue()
+                    buf.close()
+            return StreamingResponse(streaming_generator(), media_type=f"audio/{media_type}")
         else:
             sr, audio_data = next(tts_generator)
-            audio_bytes = pack_audio(BytesIO(), audio_data, sr, media_type).getvalue()
-            return Response(audio_bytes, media_type=f"audio/{media_type}")
+            buf = pack_audio(audio_data, sr, media_type)
+            response = Response(buf.getvalue(), media_type=f"audio/{media_type}")
+            buf.close()
+            return response
     except Exception as e:
         return JSONResponse(status_code=400, content={"status": "error", "message": "tts failed", "exception": str(e)})
 
@@ -491,20 +524,33 @@ async def control(command: str = None):
 
 @APP.get("/tts")
 async def tts_get_endpoint(
-    text: str = None, text_lang: str = None, ref_audio_path: str = None,
-    aux_ref_audio_paths: List[str] = None, prompt_lang: str = None, prompt_text: str = "",
-    top_k: int = 5, top_p: float = 1, temperature: float = 1, text_split_method: str = "cut0",
-    batch_size: int = 1, batch_threshold: float = 0.75, split_bucket: bool = True,
-    speed_factor: float = 1.0, fragment_interval: float = 0.3, seed: int = -1,
-    media_type: str = "wav", streaming_mode: bool = False, parallel_infer: bool = True,
+    text: str,
+    text_lang: str,
+    ref_audio_path: str,
+    aux_ref_audio_paths: Optional[List[str]] = None,
+    prompt_lang: str,
+    prompt_text: str = "",
+    top_k: int = 5,
+    top_p: float = 1,
+    temperature: float = 1,
+    text_split_method: str = "cut0",
+    batch_size: int = 1,
+    batch_threshold: float = 0.75,
+    split_bucket: bool = True,
+    speed_factor: float = 1.0,
+    fragment_interval: float = 0.3,
+    seed: int = -1,
+    media_type: str = "wav",
+    streaming_mode: bool = False,
+    parallel_infer: bool = True,
     repetition_penalty: float = 1.35
 ):
     req = {
         "text": text,
-        "text_lang": text_lang.lower() if text_lang else None,
+        "text_lang": text_lang.lower(),
         "ref_audio_path": ref_audio_path,
         "aux_ref_audio_paths": aux_ref_audio_paths,
-        "prompt_lang": prompt_lang.lower() if prompt_lang else None,
+        "prompt_lang": prompt_lang.lower(),
         "prompt_text": prompt_text,
         "top_k": top_k,
         "top_p": top_p,
@@ -525,32 +571,47 @@ async def tts_get_endpoint(
 
 @APP.post("/tts")
 async def tts_post_endpoint(request: TTS_Request):
-    req = request.dict()
-    if req["text_lang"]:
+    req = request.dict(exclude_unset=True)
+    if "text_lang" in req:
         req["text_lang"] = req["text_lang"].lower()
-    if req["prompt_lang"]:
+    if "prompt_lang" in req:
         req["prompt_lang"] = req["prompt_lang"].lower()
     return await tts_handle(req)
 
 @APP.get("/ttsrole")
-async def tts1_get_endpoint(
-    text: str = None, text_lang: str = "zh", ref_audio_path: str = None,
-    aux_ref_audio_paths: List[str] = None, prompt_lang: str = None, prompt_text: str = None,
-    emotion: str = None, role: str = None, top_k: int = 5, top_p: float = 1,
-    temperature: float = 1, text_split_method: str = "cut5", batch_size: int = 1,
-    batch_threshold: float = 0.75, split_bucket: bool = True, speed_factor: float = 1.0,
-    fragment_interval: float = 0.3, seed: int = -1, media_type: str = "wav",
-    streaming_mode: bool = False, parallel_infer: bool = True, repetition_penalty: float = 1.35
+async def ttsrole_get_endpoint(
+    text: str,
+    role: str,
+    text_lang: str = "zh",
+    ref_audio_path: Optional[str] = None,
+    aux_ref_audio_paths: Optional[List[str]] = None,
+    prompt_lang: Optional[str] = None,
+    prompt_text: Optional[str] = None,
+    emotion: Optional[str] = None,
+    top_k: int = 5,
+    top_p: float = 1,
+    temperature: float = 1,
+    text_split_method: str = "cut5",
+    batch_size: int = 1,
+    batch_threshold: float = 0.75,
+    split_bucket: bool = True,
+    speed_factor: float = 1.0,
+    fragment_interval: float = 0.3,
+    seed: int = -1,
+    media_type: str = "wav",
+    streaming_mode: bool = False,
+    parallel_infer: bool = True,
+    repetition_penalty: float = 1.35
 ):
     req = {
         "text": text,
+        "role": role,
         "text_lang": text_lang.lower(),
         "ref_audio_path": ref_audio_path,
         "aux_ref_audio_paths": aux_ref_audio_paths,
         "prompt_lang": prompt_lang.lower() if prompt_lang else None,
         "prompt_text": prompt_text,
         "emotion": emotion,
-        "role": role,
         "top_k": top_k,
         "top_p": top_p,
         "temperature": temperature,
@@ -566,21 +627,21 @@ async def tts1_get_endpoint(
         "parallel_infer": parallel_infer,
         "repetition_penalty": repetition_penalty
     }
-    return await tts_handle(req, is_tts1=True)
+    return await tts_handle(req, is_ttsrole=True)
 
 @APP.post("/ttsrole")
-async def tts1_post_endpoint(request: TTS1_Request):
-    req = request.dict()
-    if req["text_lang"]:
+async def ttsrole_post_endpoint(request: TTSRole_Request):
+    req = request.dict(exclude_unset=True)
+    if "text_lang" in req:
         req["text_lang"] = req["text_lang"].lower()
-    if req["prompt_lang"]:
+    if "prompt_lang" in req:
         req["prompt_lang"] = req["prompt_lang"].lower()
-    return await tts_handle(req, is_tts1=True)
+    return await tts_handle(req, is_ttsrole=True)
 
 @APP.get("/set_gpt_weights")
 async def set_gpt_weights(weights_path: str = None):
     try:
-        if weights_path in ["", None]:
+        if not weights_path:
             return JSONResponse(status_code=400, content={"status": "error", "message": "gpt weight path is required"})
         tts_pipeline.init_t2s_weights(weights_path)
         return JSONResponse(status_code=200, content={"status": "success", "message": "success"})
@@ -590,7 +651,7 @@ async def set_gpt_weights(weights_path: str = None):
 @APP.get("/set_sovits_weights")
 async def set_sovits_weights(weights_path: str = None):
     try:
-        if weights_path in ["", None]:
+        if not weights_path:
             return JSONResponse(status_code=400, content={"status": "error", "message": "sovits weight path is required"})
         tts_pipeline.init_vits_weights(weights_path)
         return JSONResponse(status_code=200, content={"status": "success", "message": "success"})
@@ -600,6 +661,8 @@ async def set_sovits_weights(weights_path: str = None):
 @APP.get("/set_refer_audio")
 async def set_refer_audio(refer_audio_path: str = None):
     try:
+        if not refer_audio_path:
+            return JSONResponse(status_code=400, content={"status": "error", "message": "refer audio path is required"})
         tts_pipeline.set_ref_audio(refer_audio_path)
         return JSONResponse(status_code=200, content={"status": "success", "message": "success"})
     except Exception as e:
