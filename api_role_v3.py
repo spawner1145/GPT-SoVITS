@@ -389,9 +389,9 @@ async def set_sovits_weights(weights_path: str = None):
 @APP.get("/tts")
 async def tts_get_endpoint(
     text: str,
-    text_lang: str = "auto",
     ref_audio_path: str,
     prompt_lang: str,
+    text_lang: str = "auto",
     prompt_text: str = "",
     top_k: int = 5,
     top_p: float = 1,
@@ -439,7 +439,7 @@ async def tts_post_endpoint(request: TTS_Request):
 async def ttsrole_get_endpoint(
     text: str,
     role: str,
-    text_lang: str = "zh",
+    text_lang: str = "auto",
     ref_audio_path: Optional[str] = None,
     prompt_lang: Optional[str] = None,
     prompt_text: Optional[str] = None,
